@@ -2,16 +2,17 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Карта Ошмянского уезда 1850</title>
     <style>
         body, html {
             margin: 0;
             padding: 0;
             height: 100%;
-            background-color: #f4ece1; /* Цвет старинной бумаги */
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: #f4ece1;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
             overflow: hidden;
+            user-select: none;
         }
         .container {
             display: flex;
@@ -32,28 +33,43 @@
         #map-container {
             flex: 1;
             position: relative;
-            background-color: #e5d3b3; /* Цвет исторического уезда */
+            background-color: #e5d3b3;
+            overflow: hidden;
+        }
+        #map-viewport {
+            width: 2000px; /* Делаем карту большой для перетаскивания */
+            height: 1500px;
+            position: absolute;
+            transform-origin: 0 0;
+            cursor: grab;
+        }
+        #map-viewport:active {
+            cursor: grabbing;
         }
         #map-svg {
             width: 100%;
             height: 100%;
         }
-        /* Яркие исторические маркеры-точки */
         .village-marker {
             fill: #d32f2f;
             stroke: #3e2723;
             stroke-width: 2;
             cursor: pointer;
+            transition: r 0.2s;
         }
-        /* Текстовые подписи к деревням */
+        .village-marker:hover {
+            fill: #1565c0;
+            r: 12;
+        }
         .village-label {
             fill: #3e2723;
-            font-size: 11px;
+            font-size: 13px;
             font-weight: bold;
             text-anchor: middle;
             pointer-events: none;
+            background: white;
         }
-        /* Нижняя шторка с архивными данными */
+        /* Шторка данных */
         .info-panel {
             position: absolute;
             bottom: 0;
@@ -67,7 +83,7 @@
             transform: translateY(100%);
             transition: transform 0.3s ease-out;
             z-index: 100;
-            max-height: 60%;
+            max-height: 50%;
             overflow-y: auto;
         }
         .info-panel.active {
@@ -77,7 +93,7 @@
             float: right;
             background: #eee;
             border: none;
-            padding: 5px 10px;
+            padding: 6px 12px;
             border-radius: 5px;
             cursor: pointer;
             font-weight: bold;
@@ -116,16 +132,19 @@
         <div class="header-panel">📜 Гео-Архив: Ошмянский повет (1850)</div>
         
         <div id="map-container">
-            <svg id="map-svg" viewBox="0 0 800 600">
-                <defs>
-                    <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
-                        <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#d4bfa2" stroke-width="1"/>
-                    </pattern>
-                </defs>
-                <rect width="100%" height="100%" fill="url(#grid)" />
-                <path d="M 50 100 Q 250 150 450 80 T 750 120" fill="none" stroke="#90caf9" stroke-width="4" opacity="0.6"/>
-                <g id="markers-group"></g>
-            </svg>
+            <div id="map-viewport">
+                <svg id="map-svg">
+                    <defs>
+                        <pattern id="grid" width="50" height="50" patternUnits="userSpaceOnUse">
+                            <path d="M 50 0 L 0 0 0 50" fill="none" stroke="#d4bfa2" stroke-width="1"/>
+                        </pattern>
+                    </defs>
+                    <rect width="100%" height="100%" fill="url(#grid)" />
+                    <!-- Историческая река Вилия -->
+                    <path d="M 100 200 Q 500 300 900 150 T 1800 250" fill="none" stroke="#90caf9" stroke-width="5" opacity="0.6"/>
+                    <g id="markers-group"></g>
+                </svg>
+            </div>
         </div>
 
         <div id="info-panel" class="info-panel">
@@ -135,7 +154,7 @@
     </div>
 
     <script>
-        // Ваша архивная база данных
+        // Данные ревизских сказок
         const rawRecords = [
             { fond: "515", opis: "15", delo: "866", pages: "3об-4", owner: "Иосиф Улан", estate: "Клопаче", type: "двор", place: "Поляны", url: "https://familysearch.org" },
             { fond: "515", opis: "15", delo: "866", pages: "3об-5", owner: "Иосиф Улан", estate: "Клопаче", type: "деревня", place: "Клопаче", url: "https://familysearch.org" },
@@ -146,20 +165,22 @@
             { fond: "515", opis: "15", delo: "866", pages: "419об-424", owner: "Михаил Геронимович Хрептович", estate: "Вишнево", type: "местечко", place: "Вишнево", url: "https://familysearch.org" }
         ];
 
+        // Четко заданные физические координаты для демонстрации
         const coordinatesPreset = {
-            "двор Поляны": {x: 200, y: 250},
-            "деревня Клопаче": {x: 350, y: 180},
-            "деревня Тальковщизна": {x: 520, y: 300},
-            "фольварок Поляны": {x: 240, y: 290},
-            "деревня Сураж": {x: 630, y: 220},
-            "местечко Вишнево": {x: 450, y: 420}
+            "двор Поляны": {x: 300, y: 400},
+            "деревня Клопаче": {x: 450, y: 350},
+            "деревня Тальковщизна": {x: 700, y: 500},
+            "фольварок Поляны": {x: 320, y: 440},
+            "деревня Сураж": {x: 900, y: 380},
+            "местечко Вишнево": {x: 650, y: 700}
         };
 
         const placesOnMap = {};
         rawRecords.forEach(row => {
             const key = `${row.type} ${row.place}`.trim();
             if (!placesOnMap[key]) {
-                const coords = coordinatesPreset[key] || {x: 150 + Math.random()*500, y: 150 + Math.random()*300};
+                // Если точка не задана в пресете, ставим ее в центр
+                const coords = coordinatesPreset[key] || {x: 500, y: 500};
                 placesOnMap[key] = {
                     name: row.place,
                     type: row.type,
@@ -175,24 +196,25 @@
         
         for (const key in placesOnMap) {
             const data = placesOnMap[key];
-            
-            // 1. Создаем группу для каждой локации (точка + текст подписи)
             const g = document.createElementNS("http://w3.org", "g");
             
-            // Круг-маркер
             const circle = document.createElementNS("http://w3.org", "circle");
             circle.setAttribute("cx", data.x);
             circle.setAttribute("cy", data.y);
-            circle.setAttribute("r", 8);
+            circle.setAttribute("r", 9);
             circle.setAttribute("class", "village-marker");
-            circle.onclick = (function(currentData) {
-                return function() { showPanel(currentData); };
-            })(data);
             
-            // Текстовая подпись рядом с точкой
+            // Клик открывает нижнюю шторку данных
+            circle.addEventListener('click', (function(currentData) {
+                return function(e) { 
+                    e.stopPropagation();
+                    showPanel(currentData); 
+                };
+            })(data));
+            
             const text = document.createElementNS("http://w3.org", "text");
             text.setAttribute("x", data.x);
-            text.setAttribute("y", data.y - 14);
+            text.setAttribute("y", data.y - 15);
             text.setAttribute("class", "village-label");
             text.textContent = data.name;
             
@@ -225,16 +247,17 @@
                             <td><a href="${rec.url}" target="_blank">Открыть ↗</a></td>
                          </tr>`;
             });
-            
             html += `</tbody></table>`;
             
             content.innerHTML = html;
-            panel.classList.add('active'); // Корректный JavaScript метод открытия
+            panel.classList.add('active');
         }
 
         function closePanel() {
             document.getElementById('info-panel').classList.remove('active');
         }
-    </script>
-</body>
-</html>
+
+        // --- ЛОГИКА ДВИЖЕНИЯ И ЗУМА КАРТЫ (Drag & Zoom) ---
+        const container = document.getElementById('map-container');
+        const viewport = document.getElementById('map-viewport');
+
