@@ -3,110 +3,157 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Карта Ошмянского уезда</title>
+    <title>Архив Ошмянского уезда</title>
     
-    <!-- Вшиваем стили Leaflet напрямую, чтобы Telegram не блокировал внешние CSS файлы -->
+    <!-- Подключаем официальный программный интерфейс Яндекс.Карт -->
+    <script src="https://yandex.ru" type="text/javascript"></script>
+    
     <style>
-        /* Исходные стили Leaflet ядра */
-        .leaflet-pane,.leaflet-tile,.leaflet-marker-icon,.leaflet-marker-shadow,.leaflet-tile-container,.leaflet-map-pane svg,.leaflet-map-pane canvas,.leaflet-zoom-box,.leaflet-image-layer,.leaflet-layer{position:absolute;left:0;top:0}.leaflet-container{overflow:hidden;-ms-touch-action:none;touch-action:none;cursor:grab;-webkit-user-select:none;-moz-user-select:none;-ms-user-select:none;user-select:none;-webkit-zoom:transparent}.leaflet-tile,.leaflet-marker-icon,.leaflet-marker-shadow{-webkit-user-drag:none;user-drag:none}.leaflet-tile{filter:inherit;visibility:hidden}.leaflet-tile-loaded{visibility:inherit}.leaflet-zoom-box{width:0;height:0;-moz-box-sizing:border-box;box-sizing:border-box;z-index:800}.leaflet-pane{z-index:400}.leaflet-tile-pane{z-index:200}.leaflet-overlay-pane{z-index:400}.leaflet-shadow-pane{z-index:500}.leaflet-marker-pane{z-index:600}.leaflet-tooltip-pane{z-index:650}.leaflet-popup-pane{z-index:700}.leaflet-map-pane canvas{z-index:100}.leaflet-map-pane svg{z-index:200}.leaflet-vml-shape{width:1px;height:1px}.lvml{behavior:url(#default#VML);display:inline-block;position:absolute}.leaflet-control{position:relative;z-index:800;pointer-events:auto}.leaflet-top,.leaflet-bottom{position:absolute;z-index:1000;pointer-events:none}.leaflet-top{top:0}.leaflet-right{right:0}.leaflet-bottom{bottom:0}.leaflet-left{left:0}.leaflet-control{float:left;clear:both}.leaflet-right .leaflet-control{float:right}.leaflet-top .leaflet-control{margin-top:10px}.leaflet-bottom .leaflet-control{margin-bottom:10px}.leaflet-left .leaflet-control{margin-left:10px}.leaflet-right .leaflet-control{margin-right:10px}
-        
-        /* Стили нашего интерфейса */
         body, html {
             margin: 0; padding: 0; height: 100%;
+            background-color: #f4ece1;
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
-            background-color: #f4f4f4;
+            overflow: hidden;
         }
         .container { display: flex; flex-direction: column; height: 100%; }
         .header-panel {
             background-color: #2c3e50; color: #fff; padding: 12px;
-            text-align: center; font-size: 15px; font-weight: bold; z-index: 1000;
+            text-align: center; font-size: 15px; font-weight: bold; box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+            z-index: 100;
         }
-        #map { flex: 1; width: 100%; height: 100%; z-index: 1; }
         
-        /* Красивое оформление таблиц документов в балунах */
-        .popup-table { width: 100%; border-collapse: collapse; font-size: 11px; margin-top: 5px; }
-        .popup-table th, .popup-table td { border: 1px solid #ddd; padding: 5px; text-align: left; }
-        .popup-table th { background-color: #f4f4f4; font-weight: bold; }
-        .popup-title { font-size: 13px; font-weight: bold; margin: 0 0 5px 0; color: #2c3e50; }
+        /* ВЕРХНЯЯ ПАНЕЛЬ С БЫСТРЫМ ПОИСКОМ ДЕРЕВЕНЬ */
+        .search-panel {
+            background-color: #fff; padding: 10px; border-bottom: 1px solid #d4bfa2;
+            display: flex; gap: 8px; overflow-x: auto; white-space: nowrap;
+            -webkit-overflow-scrolling: touch; z-index: 100;
+        }
+        .place-link {
+            display: inline-block; background-color: #f5f5f5; color: #2c3e50;
+            padding: 8px 14px; border: 1px solid #ccc; border-radius: 20px;
+            font-size: 13px; font-weight: bold; text-decoration: none; cursor: pointer;
+        }
+        .place-link:hover { background-color: #e0e0e0; }
+        .place-link.active-btn { background-color: #d32f2f; color: white; border-color: #d32f2f; }
+
+        /* БЛОК НАСТОЯЩЕЙ КАРТЫ */
+        #map { flex: 1; width: 100%; height: 100%; }
+
+        /* ВСПЛЫВАЮЩИЕ ОКНА (БАЛУНЫ) С АРХИВНЫМИ ТАБЛИЦАМИ */
+        .popup-table { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 8px; }
+        .popup-table th, .popup-table td { border: 1px solid #e0e0e0; padding: 6px; text-align: left; }
+        .popup-table th { background-color: #f5f5f5; color: #2c3e50; font-weight: bold; }
+        .popup-title { font-size: 14px; font-weight: bold; color: #2c3e50; margin-bottom: 4px; }
     </style>
 </head>
 <body>
 
     <div class="container">
-        <div class="header-panel">🗺️ Настоящая карта: Ошмянский повет (1850)</div>
+        <div class="header-panel">📜 Гео-Архив: Ошмянский повет (1850)</div>
+        
+        <!-- Верхнее быстрое меню -->
+        <div class="search-panel" id="buttons-container"></div>
+        
+        <!-- Полноценная карта местности -->
         <div id="map"></div>
     </div>
 
-    <!-- Загружаем Leaflet через ESM-модуль. Это самый современный и безопасный метод, защищенный от блокировок Telegram -->
-    <script type="module">
-        import 'https://jsdelivr.net';
+    <script type="text/javascript">
+        // Ожидаем загрузку Яндекс.Карт
+        ymaps.ready(init);
 
-        window.addEventListener('DOMContentLoaded', () => {
-            // Ждем долей секунды, пока модуль Leaflet полностью развернется в памяти телефона
-            setTimeout(() => {
-                try {
-                    // 1. Инициализация НАСТОЯЩЕЙ карты на Ошмяны
-                    const map = L.map('map').setView([54.4231, 25.9357], 10);
+        // Реальная архивная база данных с привязанными GPS-координатами Ошмянского региона
+        const rawRecords = [
+            { fond: "515", delo: "866", pages: "3об-4", owner: "Иосиф Улан", estate: "Клопаче", type: "двор", place: "Поляны", lat: 54.4371, lng: 25.8752 },
+            { fond: "515", delo: "866", pages: "3об-5", owner: "Иосиф Улан", estate: "Клопаче", type: "деревня", place: "Клопаче", lat: 54.4079, lng: 25.9691 },
+            { fond: "515", delo: "866", pages: "13об-16", owner: "Томаш Умястовский", estate: "Тальковщизна", type: "деревня", place: "Тальковщизна", lat: 54.4891, lng: 25.9922 },
+            { fond: "515", delo: "866", pages: "21об-22", owner: "Авраам Улан", estate: "Поляны", type: "фольварок", place: "Поляны", lat: 54.4371, lng: 25.8752 },
+            { fond: "515", delo: "866", pages: "419об-424", owner: "Михаил Хрептович", estate: "Вишнево", type: "местечко", place: "Вишнево", lat: 54.1411, lng: 26.2139 },
+            { fond: "515", delo: "866", pages: "29об-33", owner: "Антоний Умястовский", estate: "Бердовщизна", type: "деревня", place: "Сураж", lat: 54.0454, lng: 26.0125 }
+        ];
 
-                    # 2. Подключаем НАСТОЯЩИЙ мировой сервер карт (CartoDB Voyager)
-                    # Он детальный, быстрый и полностью легален для работы в РБ без VPN
-                    L.tileLayer('https://{s}://{z}/{x}/{y}{r}.png', {
-                        maxZoom: 19,
-                        attribution: '© OpenStreetMap'
-                    }).addTo(map);
+        function init() {
+            // 1. Создаем карту местности (центрируем на Ошмяны)
+            const myMap = new ymaps.Map("map", {
+                center: [54.4231, 25.9357],
+                zoom: 10,
+                // Добавляем переключатель слоев: Схема, Спутник, Гибрид
+                controls: ['zoomControl', 'typeSelector']
+            });
 
-                    // 3. Реальные географические координаты для теста (Поляны, Клопаче, Вишнево)
-                    const rawRecords = [
-                        { fond: "515", delo: "866", pages: "3об-4", owner: "Иосиф Улан", estate: "Клопаче", type: "двор", place: "Поляны", lat: 54.4512, lng: 25.9144 },
-                        { fond: "515", delo: "866", pages: "3об-5", owner: "Иосиф Улан", estate: "Клопаче", type: "деревня", place: "Клопаче", lat: 54.4120, lng: 25.9611 },
-                        { fond: "515", delo: "866", pages: "419об-424", owner: "Михаил Хрептович", estate: "Вишнево", type: "местечко", place: "Вишнево", lat: 54.1411, lng: 26.2139 }
-                    ];
-
-                    // 4. Автоматическая группировка данных по точкам
-                    const placesOnMap = {};
-                    rawRecords.forEach(row => {
-                        const key = `${row.type} ${row.place}`.trim();
-                        if (!placesOnMap[key]) {
-                            placesOnMap[key] = {
-                                name: row.place, type: row.type, lat: row.lat, lng: row.lng, records: []
-                            };
-                        }
-                        placesOnMap[key].records.push(row);
-                    });
-
-                    // 5. Отрисовка маркеров на НАСТОЯЩЕЙ карте местности
-                    for (const key in placesOnMap) {
-                        const data = placesOnMap[key];
-                        const marker = L.marker([data.lat, data.lng]).addTo(map);
-
-                        let popupContent = `<div class="popup-title">📍 ${data.type} ${data.name}</div>`;
-                        popupContent += `<table class="popup-table">
-                                            <thead>
-                                                <tr>
-                                                    <th>Шифр</th>
-                                                    <th>Листы</th>
-                                                    <th>Помещик / Имение</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>`;
-
-                        data.records.forEach(rec => {
-                            popupContent += `<tr>
-                                                <td>Ф.${rec.fond}, д.${rec.delo}</td>
-                                                <td>л.${rec.pages}</td>
-                                                <td>${rec.owner}<br><small style="color:gray">им. ${rec.estate}</small></td>
-                                             </tr>`;
-                        });
-                        popupContent += `</tbody></table>`;
-                        
-                        marker.bindPopup(popupContent, { maxWidth: 360 });
-                    }
-
-                } catch (err) {
-                    console.error("Ошибка загрузки настоящей карты местности:", err);
+            // 2. Группируем дубликаты записей по населенным пунктам
+            const placesOnMap = {};
+            rawRecords.forEach(row => {
+                const key = row.place; // Группируем чисто по названию, чтобы объединить фольварки и деревни
+                if (!placesOnMap[key]) {
+                    placesOnMap[key] = {
+                        name: row.place, lat: row.lat, lng: row.lng, placemarkRef: null, records: []
+                    };
                 }
-            }, 300);
-        });
+                placesOnMap[key].records.push(row);
+            });
+
+            const buttonsContainer = document.getElementById('buttons-container');
+
+            // 3. Создаем маркеры на карте и кнопки в верхнем меню
+            for (const key in placesOnMap) {
+                const data = placesOnMap[key];
+
+                // Формируем красивую таблицу документов для всплывающего балуна
+                let popupContent = `<div class="popup-title">📍 Населенный пункт: <b>${data.name}</b></div>`;
+                popupContent += `<table class="popup-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Статус</th>
+                                            <th>Архивный шифр</th>
+                                            <th>Листы</th>
+                                            <th>Помещик / Имение</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>`;
+
+                data.records.forEach(rec => {
+                    popupContent += `<tr>
+                                        <td><b>${rec.type}</b></td>
+                                        <td>Ф. ${rec.fond}, д. ${rec.delo}</td>
+                                        <td>л. ${rec.pages}</td>
+                                        <td>${rec.owner}<br><small style="color:gray">им. ${rec.estate}</small></td>
+                                     </tr>`;
+                });
+                popupContent += `</tbody></table>`;
+
+                // Добавляем физический маркер на Яндекс.Карту
+                const placemark = new ymaps.Placemark([data.lat, data.lng], {
+                    balloonContentBody: popupContent,
+                    hintContent: data.name
+                }, {
+                    preset: 'islands#redDotIcon'
+                });
+
+                myMap.geoObjects.add(placemark);
+                data.placemarkRef = placemark; // Сохраняем ссылку на маркер
+
+                # Создаем кнопку в верхнем поисковом меню
+                const btn = document.createElement('div');
+                btn.className = 'place-link';
+                btn.innerText = '📍 ' + data.name;
+                
+                # При клике на кнопку сверху карта САМА плавно летит к деревне и открывает документы
+                btn.onclick = function() {
+                    # Сбрасываем выделение кнопок
+                    document.querySelectorAll('.place-link').forEach(b => b.classList.remove('active-btn'));
+                    btn.classList.add('active-btn');
+                    
+                    # Плавный полет карты к реальной координате деревни
+                    myMap.panTo([data.lat, data.lng], { flying: true, duration: 800 }).then(() => {
+                        myMap.setZoom(12);
+                        data.placemarkRef.balloon.open(); // Открываем архивную таблицу прямо на карте
+                    });
+                };
+
+                buttonsContainer.appendChild(btn);
+            }
+        }
     </script>
 </body>
 </html>
