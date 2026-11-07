@@ -5,19 +5,23 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Карта Ошмянского уезда 1850</title>
     
-    <!-- Подключаем API Яндекс.Карт — супернадежно и без скачивания файлов -->
-    <script src="https://yandex.ru" type="text/javascript"></script>
+    <!-- Надежные внешние библиотеки Leaflet, которые одобрены Telegram -->
+    <link rel="stylesheet" href="https://cloudflare.com" />
+    <script src="https://cloudflare.com"></script>
     
     <style>
         body, html {
             margin: 0;
             padding: 0;
             height: 100%;
-            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
         }
         #map {
             width: 100%;
             height: 100%;
+            position: absolute;
+            top: 0;
+            bottom: 0;
         }
         .popup-table {
             width: 100%;
@@ -46,85 +50,79 @@
 
     <div id="map"></div>
 
-    <script type="text/javascript">
-        // Ожидаем полную загрузку API Яндекс.Карт
-        ymaps.ready(init);
-        
-        function init() {
-            // 1. Создание карты с центром в Ошмянах
-            var myMap = new ymaps.Map("map", {
-                center: [54.4231, 25.9357],
-                zoom: 10,
-                controls: ['zoomControl', 'typeSelector']
-            });
+    <script>
+        window.onload = function() {
+            try {
+                // 1. Инициализация карты (Ошмяны)
+                var map = L.map('map').setView([54.4231, 25.9357], 10);
 
-            // 2. Тестовый массив архивных данных
-            var rawRecords = [
-                { fond: "515", opis: "15", delo: "866", pages: "3об-4", owner: "Иосиф Улан", estate: "Клопаче", type: "двор", place: "Поляны", url: "https://familysearch.org" },
-                { fond: "515", opis: "15", delo: "866", pages: "3об-5", owner: "Иосиф Улан", estate: "Клопаче", type: "деревня", place: "Клопаче", url: "https://familysearch.org" },
-                { fond: "515", opis: "15", delo: "866", pages: "13об-16", owner: "Томаш Геронимович Умястовский", estate: "Тальковщизна", type: "деревня", place: "Тальковщизна", url: "https://familysearch.org" },
-                { fond: "515", opis: "15", delo: "866", pages: "21об-22", owner: "Авраам Матвеевич Улан", estate: "Поляны", type: "фольварок", place: "Поляны", url: "https://familysearch.org" },
-                { fond: "515", opis: "15", delo: "866", pages: "21об-22", owner: "Авраам Матвеевич Улан", estate: "Поляны", type: "деревня", place: "Клопаче", url: "https://familysearch.org" },
-                { fond: "515", opis: "15", delo: "866", pages: "29об-33", owner: "Антоний Яковлевич Умястовский", estate: "Бердовщизна", type: "деревня", place: "Сураж", url: "https://familysearch.org" },
-                { fond: "515", opis: "15", delo: "866", pages: "419об-424", owner: "Михаил Геронимович Хрептович", estate: "Вишнево", type: "местечко", place: "Вишнево", url: "https://familysearch.org" }
-            ];
+                // 2. Универсальный сервер подложки (CartoDB Voyager) — он открывается без ключей и блокировок
+                L.tileLayer('https://{s}://{z}/{x}/{y}{r}.png', {
+                    maxZoom: 20,
+                    attribution: '© OpenStreetMap'
+                }).addTo(map);
 
-            // 3. Автоматическая группировка дубликатов названий
-            var placesOnMap = {};
-            rawRecords.forEach(function(row) {
-                var key = (row.type + " " + row.place).trim();
-                if (!placesOnMap[key]) {
-                    placesOnMap[key] = {
-                        name: row.place,
-                        type: row.type,
-                        // Генерируем тестовые точки недалеко от Ошмян
-                        lat: 54.4231 + (Math.random() - 0.5) * 0.15,
-                        lng: 25.9357 + (Math.random() - 0.5) * 0.15,
-                        records: []
-                    };
+                // 3. Ваша архивная база данных
+                var rawRecords = [
+                    { fond: "515", opis: "15", delo: "866", pages: "3об-4", owner: "Иосиф Улан", estate: "Клопаче", type: "двор", place: "Поляны", url: "https://familysearch.org" },
+                    { fond: "515", opis: "15", delo: "866", pages: "3об-5", owner: "Иосиф Улан", estate: "Клопаче", type: "деревня", place: "Клопаче", url: "https://familysearch.org" },
+                    { fond: "515", opis: "15", delo: "866", pages: "13об-16", owner: "Томаш Геронимович Умястовский", estate: "Тальковщизна", type: "деревня", place: "Тальковщизна", url: "https://familysearch.org" },
+                    { fond: "515", opis: "15", delo: "866", pages: "21об-22", owner: "Авраам Матвеевич Улан", estate: "Поляны", type: "фольварок", place: "Поляны", url: "https://familysearch.org" },
+                    { fond: "515", opis: "15", delo: "866", pages: "21об-22", owner: "Авраам Матвеевич Улан", estate: "Поляны", type: "деревня", place: "Клопаче", url: "https://familysearch.org" },
+                    { fond: "515", opis: "15", delo: "866", pages: "29об-33", owner: "Антоний Яковлевич Умястовский", estate: "Бердовщизна", type: "деревня", place: "Сураж", url: "https://familysearch.org" },
+                    { fond: "515", opis: "15", delo: "866", pages: "419об-424", owner: "Михаил Геронимович Хрептович", estate: "Вишнево", type: "местечко", place: "Вишнево", url: "https://familysearch.org" }
+                ];
+
+                // 4. Группировка дубликатов населенных пунктов
+                var placesOnMap = {};
+                rawRecords.forEach(function(row) {
+                    var key = (row.type + " " + row.place).trim();
+                    if (!placesOnMap[key]) {
+                        placesOnMap[key] = {
+                            name: row.place,
+                            type: row.type,
+                            lat: 54.4231 + (Math.random() - 0.5) * 0.15,
+                            lng: 25.9357 + (Math.random() - 0.5) * 0.15,
+                            records: []
+                        };
+                    }
+                    placesOnMap[key].records.push(row);
+                });
+
+                // 5. Отрисовка точек
+                for (var key in placesOnMap) {
+                    var data = placesOnMap[key];
+                    var marker = L.marker([data.lat, data.lng]).addTo(map);
+
+                    var popupContent = '<div class="popup-title">' + data.type + ' ' + data.name + '</div>';
+                    popupContent += '<table class="popup-table">' +
+                                        '<thead>' +
+                                            '<tr>' +
+                                                '<th>Шифр</th>' +
+                                                '<th>Листы</th>' +
+                                                '<th>Владелец</th>' +
+                                                '<th>Ссылка</th>' +
+                                            '</tr>' +
+                                        '</thead>' +
+                                        '<tbody>';
+
+                    data.records.forEach(function(rec) {
+                        popupContent += '<tr>' +
+                                            '<td>Ф. ' + rec.fond + ', оп. ' + rec.opis + ', д. ' + rec.delo + '</td>' +
+                                            '<td>' + rec.pages + '</td>' +
+                                            '<td>' + rec.owner + '<br><small style="color:gray">им. ' + rec.estate + '</small></td>' +
+                                            '<td><a href="' + rec.url + '" target="_blank">Открыть ↗</a></td>' +
+                                         '</tr>';
+                    });
+
+                    popupContent += '</tbody></table>';
+                    marker.bindPopup(popupContent, { maxWidth: 450 });
                 }
-                placesOnMap[key].records.push(row);
-            });
 
-            // 4. Отрисовка маркеров на карте
-            for (var key in placesOnMap) {
-                var data = placesOnMap[key];
-
-                // Формируем внутреннюю таблицу для всплывающего окна (балуна)
-                var popupContent = '<div class="popup-title">' + data.type + ' ' + data.name + '</div>';
-                popupContent += '<table class="popup-table">' +
-                                    '<thead>' +
-                                        '<tr>' +
-                                            '<th>Шифр</th>' +
-                                            '<th>Листы</th>' +
-                                            '<th>Владелец / Имение</th>' +
-                                            '<th>Ссылка</th>' +
-                                        '</tr>' +
-                                    '</thead>' +
-                                    '<tbody>';
-
-                data.records.forEach(function(rec) {
-                    popupContent += '<tr>' +
-                                        '<td>Ф. ' + rec.fond + ', оп. ' + rec.opis + ', д. ' + rec.delo + '</td>' +
-                                        '<td>' + rec.pages + '</td>' +
-                                        '<td>' + rec.owner + '<br><small style="color:gray">им. ' + rec.estate + '</small></td>' +
-                                        '<td><a href="' + rec.url + '" target="_blank">Открыть ↗</a></td>' +
-                                     '</tr>';
-                });
-
-                popupContent += '</tbody></table>';
-
-                // Создаем саму метку на Яндекс.Картах
-                var placemark = new ymaps.Placemark([data.lat, data.lng], {
-                    balloonContentBody: popupContent, // Передаем нашу таблицу внутрь окна
-                    hintContent: data.type + ' ' + data.name
-                }, {
-                    preset: 'islands#blueDotIcon' // Красивый синий значок
-                });
-
-                myMap.geoObjects.add(placemark);
+            } catch (e) {
+                console.error("Ошибка:", e);
             }
-        }
+        };
     </script>
 </body>
 </html>
