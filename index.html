@@ -4,125 +4,236 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Карта Ошмянского уезда 1850</title>
-    
-    <!-- Надежные внешние библиотеки Leaflet, которые одобрены Telegram -->
-    <link rel="stylesheet" href="https://cloudflare.com" />
-    <script src="https://cloudflare.com"></script>
-    
     <style>
         body, html {
             margin: 0;
             padding: 0;
             height: 100%;
-            background-color: #f4f4f4;
+            background-color: #f4ece1; /* Цвет старинной бумаги */
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            overflow: hidden;
         }
-        #map {
+        .container {
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+            position: relative;
+        }
+        .header-panel {
+            background-color: #3e2723;
+            color: #fff;
+            padding: 12px;
+            text-align: center;
+            font-size: 15px;
+            font-weight: bold;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+            z-index: 10;
+        }
+        #map-container {
+            flex: 1;
+            position: relative;
+            cursor: grab;
+            background-color: #e5d3b3; /* Цвет исторического уезда */
+        }
+        #map-svg {
             width: 100%;
             height: 100%;
+        }
+        /* Стили маркеров */
+        .village-marker {
+            fill: #d32f2f;
+            stroke: #fff;
+            stroke-width: 2;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        .village-marker:hover {
+            fill: #1565c0;
+            r: 10;
+        }
+        /* Информационная панель (вместо всплывающего окна Leaflet) */
+        .info-panel {
             position: absolute;
-            top: 0;
             bottom: 0;
+            left: 0;
+            right: 0;
+            background: white;
+            border-top-left-radius: 16px;
+            border-top-right-radius: 16px;
+            box-shadow: 0 -4px 15px rgba(0,0,0,0.2);
+            padding: 16px;
+            transform: translateY(100%);
+            transition: transform 0.3s ease-out;
+            z-index: 100;
+            max-height: 60%;
+            overflow-y: auto;
+        }
+        .info-panel.active {
+            transform: translateY(0);
+        }
+        .close-btn {
+            float: right;
+            background: #eee;
+            border: none;
+            padding: 5px 10px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        .popup-title {
+            font-size: 16px;
+            font-weight: bold;
+            margin-bottom: 10px;
+            color: #3e2723;
         }
         .popup-table {
             width: 100%;
             border-collapse: collapse;
-            margin-top: 5px;
-            font-size: 11px;
+            font-size: 12px;
+            margin-top: 10px;
         }
         .popup-table th, .popup-table td {
-            border: 1px solid #ddd;
-            padding: 5px;
+            border: 1px solid #e0e0e0;
+            padding: 8px;
             text-align: left;
         }
         .popup-table th {
-            background-color: #f4f4f4;
-            font-weight: bold;
+            background-color: #f5f5f5;
+            color: #5d4037;
         }
-        .popup-title {
-            font-size: 14px;
-            margin: 0 0 5px 0;
+        .popup-table a {
+            color: #1565c0;
+            text-decoration: none;
             font-weight: bold;
-            color: #222;
         }
     </style>
 </head>
 <body>
 
-    <div id="map"></div>
+    <div class="container">
+        <div class="header-panel">📜 Гео-Архив: Ошмянский повет (1850)</div>
+        
+        <div id="map-container">
+            <!-- Интерактивная векторная карта ВКЛ / Уезда -->
+            <svg id="map-svg" viewBox="0 0 800 600">
+                <!-- Сетка старой карты -->
+                <defs>
+                    <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+                        <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#d4bfa2" stroke-width="1"/>
+                    </pattern>
+                </defs>
+                <rect width="100%" height="100%" fill="url(#grid)" />
+                
+                <!-- Река Вилия (для исторического антуража) -->
+                <path d="M 50 100 Q 250 150 450 80 T 750 120" fill="none" stroke="#90caf9" stroke-width="4" opacity="0.7"/>
+                
+                <!-- Точки населенных пунктов будут добавлены сюда через JavaScript -->
+                <g id="markers-group"></g>
+            </svg>
+        </div>
+
+        <!-- Нижняя шторка с архивными данными -->
+        <div id="info-panel" class="info-panel">
+            <button class="close-btn" onclick="closePanel()">✕</button>
+            <div id="panel-content"></div>
+        </div>
+    </div>
 
     <script>
-        window.onload = function() {
-            try {
-                // 1. Инициализация карты (Ошмяны)
-                var map = L.map('map').setView([54.4231, 25.9357], 10);
+        // Наша база ревизских сказок
+        const rawRecords = [
+            { fond: "515", opis: "15", delo: "866", pages: "3об-4", owner: "Иосиф Улан", estate: "Клопаче", type: "двор", place: "Поляны", url: "https://familysearch.org" },
+            { fond: "515", opis: "15", delo: "866", pages: "3об-5", owner: "Иосиф Улан", estate: "Клопаче", type: "деревня", place: "Клопаче", url: "https://familysearch.org" },
+            { fond: "515", opis: "15", delo: "866", pages: "13об-16", owner: "Томаш Геронимович Умястовский", estate: "Тальковщизна", type: "деревня", place: "Тальковщизна", url: "https://familysearch.org" },
+            { fond: "515", opis: "15", delo: "866", pages: "21об-22", owner: "Авраам Матвеевич Улан", estate: "Поляны", type: "фольварок", place: "Поляны", url: "https://familysearch.org" },
+            { fond: "515", opis: "15", delo: "866", pages: "21об-22", owner: "Авраам Матвеевич Улан", estate: "Поляны", type: "деревня", place: "Клопаче", url: "https://familysearch.org" },
+            { fond: "515", opis: "15", delo: "866", pages: "29об-33", owner: "Антоний Яковлевич Умястовский", estate: "Бердовщизна", type: "деревня", place: "Сураж", url: "https://familysearch.org" },
+            { fond: "515", opis: "15", delo: "866", pages: "419об-424", owner: "Михаил Геронимович Хрептович", estate: "Вишнево", type: "местечко", place: "Вишнево", url: "https://familysearch.org" }
+        ];
 
-                // 2. Универсальный сервер подложки (CartoDB Voyager) — он открывается без ключей и блокировок
-                L.tileLayer('https://{s}://{z}/{x}/{y}{r}.png', {
-                    maxZoom: 20,
-                    attribution: '© OpenStreetMap'
-                }).addTo(map);
-
-                // 3. Ваша архивная база данных
-                var rawRecords = [
-                    { fond: "515", opis: "15", delo: "866", pages: "3об-4", owner: "Иосиф Улан", estate: "Клопаче", type: "двор", place: "Поляны", url: "https://familysearch.org" },
-                    { fond: "515", opis: "15", delo: "866", pages: "3об-5", owner: "Иосиф Улан", estate: "Клопаче", type: "деревня", place: "Клопаче", url: "https://familysearch.org" },
-                    { fond: "515", opis: "15", delo: "866", pages: "13об-16", owner: "Томаш Геронимович Умястовский", estate: "Тальковщизна", type: "деревня", place: "Тальковщизна", url: "https://familysearch.org" },
-                    { fond: "515", opis: "15", delo: "866", pages: "21об-22", owner: "Авраам Матвеевич Улан", estate: "Поляны", type: "фольварок", place: "Поляны", url: "https://familysearch.org" },
-                    { fond: "515", opis: "15", delo: "866", pages: "21об-22", owner: "Авраам Матвеевич Улан", estate: "Поляны", type: "деревня", place: "Клопаче", url: "https://familysearch.org" },
-                    { fond: "515", opis: "15", delo: "866", pages: "29об-33", owner: "Антоний Яковлевич Умястовский", estate: "Бердовщизна", type: "деревня", place: "Сураж", url: "https://familysearch.org" },
-                    { fond: "515", opis: "15", delo: "866", pages: "419об-424", owner: "Михаил Геронимович Хрептович", estate: "Вишнево", type: "местечко", place: "Вишнево", url: "https://familysearch.org" }
-                ];
-
-                // 4. Группировка дубликатов населенных пунктов
-                var placesOnMap = {};
-                rawRecords.forEach(function(row) {
-                    var key = (row.type + " " + row.place).trim();
-                    if (!placesOnMap[key]) {
-                        placesOnMap[key] = {
-                            name: row.place,
-                            type: row.type,
-                            lat: 54.4231 + (Math.random() - 0.5) * 0.15,
-                            lng: 25.9357 + (Math.random() - 0.5) * 0.15,
-                            records: []
-                        };
-                    }
-                    placesOnMap[key].records.push(row);
-                });
-
-                // 5. Отрисовка точек
-                for (var key in placesOnMap) {
-                    var data = placesOnMap[key];
-                    var marker = L.marker([data.lat, data.lng]).addTo(map);
-
-                    var popupContent = '<div class="popup-title">' + data.type + ' ' + data.name + '</div>';
-                    popupContent += '<table class="popup-table">' +
-                                        '<thead>' +
-                                            '<tr>' +
-                                                '<th>Шифр</th>' +
-                                                '<th>Листы</th>' +
-                                                '<th>Владелец</th>' +
-                                                '<th>Ссылка</th>' +
-                                            '</tr>' +
-                                        '</thead>' +
-                                        '<tbody>';
-
-                    data.records.forEach(function(rec) {
-                        popupContent += '<tr>' +
-                                            '<td>Ф. ' + rec.fond + ', оп. ' + rec.opis + ', д. ' + rec.delo + '</td>' +
-                                            '<td>' + rec.pages + '</td>' +
-                                            '<td>' + rec.owner + '<br><small style="color:gray">им. ' + rec.estate + '</small></td>' +
-                                            '<td><a href="' + rec.url + '" target="_blank">Открыть ↗</a></td>' +
-                                         '</tr>';
-                    });
-
-                    popupContent += '</tbody></table>';
-                    marker.bindPopup(popupContent, { maxWidth: 450 });
-                }
-
-            } catch (e) {
-                console.error("Ошибка:", e);
-            }
+        // Фиксированные координаты на нашей карте (для теста)
+        const coordinatesPreset = {
+            "двор Поляны": {x: 200, y: 250},
+            "деревня Клопаче": {x: 350, y: 180},
+            "деревня Тальковщизна": {x: 500, y: 300},
+            "фольварок Поляны": {x: 230, y: 270},
+            "деревня Сураж": {x: 600, y: 220},
+            "местечко Вишнево": {x: 450, y: 400}
         };
+
+        // Группировка
+        const placesOnMap = {};
+        rawRecords.forEach(row => {
+            const key = `${row.type} ${row.place}`.trim();
+            if (!placesOnMap[key]) {
+                const coords = coordinatesPreset[key] || {x: 100 + Math.random()*500, y: 100 + Math.random()*400};
+                placesOnMap[key] = {
+                    name: row.place,
+                    type: row.type,
+                    x: coords.x,
+                    y: coords.y,
+                    records: []
+                };
+            }
+            placesOnMap[key].records.push(row);
+        });
+
+        // Отрисовка маркеров в SVG
+        const markersGroup = document.getElementById('markers-group');
+        
+        for (const key in placesOnMap) {
+            const data = placesOnMap[key];
+            
+            // Создаем круглую точку
+            const circle = document.createElementNS("http://w3.org", "circle");
+            circle.setAttribute("cx", data.x);
+            circle.setAttribute("cy", data.y);
+            circle.setAttribute("r", 7);
+            circle.setAttribute("class", "village-marker");
+            
+            // Навешиваем событие клика
+            circle.onclick = function() {
+                showPanel(data);
+            };
+            
+            markersGroup.appendChild(circle);
+        }
+
+        function showPanel(data) {
+            const panel = document.getElementById('info-panel');
+            const content = document.getElementById('panel-content');
+            
+            let html = `<div class="popup-title">📍 ${data.type} ${data.name}</div>`;
+            html += `<table class="popup-table">
+                        <thead>
+                            <tr>
+                                <th>Шифр дела</th>
+                                <th>Листы</th>
+                                <th>Помещик / Имение</th>
+                                <th>Документ</th>
+                            </tr>
+                        </thead>
+                        <tbody>`;
+            
+            data.records.forEach(rec => {
+                html += `<tr>
+                            <td>Ф. ${rec.fond}, оп. ${rec.opis}, д. ${rec.delo}</td>
+                            <td>${rec.pages}</td>
+                            <td><b>${rec.owner}</b><br><span style="color:#795548">им. ${rec.estate}</span></td>
+                            <td><a href="${rec.url}" target="_blank">Открыть ↗</a></td>
+                         </tr>`;
+            });
+            
+            html += `</tbody></table>`;
+            
+            content.innerHTML = html;
+            panel.add('active'); // Открываем шторку
+            panel.classList.add('active');
+        }
+
+        function closePanel() {
+            document.getElementById('info-panel').classList.remove('active');
+        }
     </script>
 </body>
 </html>
