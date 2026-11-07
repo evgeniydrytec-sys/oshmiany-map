@@ -13,6 +13,7 @@
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
             overflow: hidden;
             user-select: none;
+            -webkit-user-select: none;
         }
         .container {
             display: flex;
@@ -35,15 +36,17 @@
             position: relative;
             background-color: #e5d3b3;
             overflow: hidden;
+            touch-action: none; /* Отключаем стандартный скролл браузера */
         }
         #map-viewport {
-            width: 1600px;
-            height: 1200px;
+            width: 2000px;
+            height: 1600px;
             position: absolute;
             transform-origin: 0 0;
             background-color: #e5d3b3;
             left: 0;
             top: 0;
+            will-change: transform;
         }
         #map-svg {
             width: 100%;
@@ -54,7 +57,6 @@
             stroke: #d4bfa2;
             stroke-width: 1;
         }
-        /* Стили для точек-деревень */
         .village-marker {
             fill: #d32f2f;
             stroke: #fff;
@@ -68,7 +70,6 @@
             text-anchor: middle;
             pointer-events: none;
         }
-        /* Шторка архивных данных */
         .info-panel {
             position: absolute;
             bottom: 0;
@@ -134,30 +135,21 @@
                         </pattern>
                     </defs>
                     <rect width="100%" height="100%" fill="url(#map-grid)" />
+                    <path d="M 50 200 Q 400 350 800 200 T 1800 300" fill="none" stroke="#a0c4ff" stroke-width="5" opacity="0.7"/>
                     
-                    <!-- Историческая река Вилия -->
-                    <path d="M 50 200 Q 400 350 800 200 T 1500 300" fill="none" stroke="#a0c4ff" stroke-width="5" opacity="0.7"/>
-                    
-                    <!-- ТОЧКИ И ПОДПИСИ ВНЕДРЕНЫ НАПРЯМУЮ В HTML -->
-                    <!-- Каждая точка имеет вызов функции клика с её уникальным именем -->
                     <g id="historic-places">
-                        <!-- Поляны -->
                         <circle cx="300" cy="400" r="10" class="village-marker" onclick="openArchive('Поляны')"/>
                         <text x="300" y="380" class="village-label">Поляны</text>
 
-                        <!-- Клопаче -->
                         <circle cx="500" cy="320" r="10" class="village-marker" onclick="openArchive('Клопаче')"/>
                         <text x="500" y="300" class="village-label">Клопаче</text>
 
-                        <!-- Тальковщизна -->
                         <circle cx="750" cy="500" r="10" class="village-marker" onclick="openArchive('Тальковщизна')"/>
                         <text x="750" y="480" class="village-label">Тальковщизна</text>
 
-                        <!-- Вишнево -->
                         <circle cx="600" cy="750" r="10" class="village-marker" onclick="openArchive('Вишнево')"/>
                         <text x="600" y="730" class="village-label">Вишнево</text>
 
-                        <!-- Сураж -->
                         <circle cx="1100" cy="350" r="10" class="village-marker" onclick="openArchive('Сураж')"/>
                         <text x="1100" y="330" class="village-label">Сураж</text>
                     </g>
@@ -165,7 +157,6 @@
             </div>
         </div>
 
-        <!-- Нижняя шторка данных -->
         <div id="info-panel" class="info-panel">
             <button class="close-btn" onclick="closePanel()">✕</button>
             <div id="panel-content"></div>
@@ -173,7 +164,6 @@
     </div>
 
     <script>
-        // Чистая база архивных документов без логики расстановки точек
         const archiveDatabase = {
             "Поляны": [
                 { type: "двор", fond: "515", delo: "866", pages: "3об-4", owner: "Иосиф Улан", estate: "Клопаче" },
@@ -187,14 +177,13 @@
                 { type: "деревня", fond: "515", delo: "866", pages: "13об-16", owner: "Томаш Умястовский", estate: "Тальковщизна" }
             ],
             "Вишнево": [
-                { type: "местечко", fond: "515", delo: "866", pages: "419об-424", owner: "Михаил Хрептович", estate: "Вишнево" }
+                { type: "местечко", fond: "515", delo: "866", pages: "419об-424", owner: "Михаил Хreptoвич", estate: "Вишнево" }
             ],
             "Сураж": [
                 { type: "деревня", fond: "515", delo: "866", pages: "29об-33", owner: "Антоний Умястовский", estate: "Бердовщизна" }
             ]
         };
 
-        // Функция открытия шторки данных при клике на точку
         function openArchive(placeName) {
             const records = archiveDatabase[placeName];
             if (!records) return;
@@ -232,38 +221,53 @@
             document.getElementById('info-panel').classList.remove('active');
         }
 
-        // Простая, безошибочная логика перетаскивания карты пальцем/мышкой
+        // --- ИСПРАВЛЕННАЯ СИСТЕМА ДВИЖЕНИЯ И ЗУМА ДЛЯ TELEGRAM ---
         const container = document.getElementById('map-container');
         const viewport = document.getElementById('map-viewport');
 
         let isDragging = false;
         let startX, startY;
-        let translateX = 0, translateY = 0;
+        let translateX = -100, translateY = -100;
+        let scale = 1;
+        let startDist = 0; // Для зума двумя пальцами
 
-        // Нажатие мыши (ПК)
+        function updateTransform() {
+            viewport.style.transform = `translate(${translateX}px, ${translateY}px) scale(${scale})`;
+        }
+
+        updateTransform();
+
+        // Управление мышкой (ПК)
         container.addEventListener('mousedown', (e) => {
             isDragging = true;
             startX = e.clientX - translateX;
             startY = e.clientY - translateY;
         });
 
-        // Движение мыши (ПК)
         window.addEventListener('mousemove', (e) => {
             if (!isDragging) return;
             translateX = e.clientX - startX;
             translateY = e.clientY - startY;
-            viewport.style.transform = `translate(${translateX}px, ${translateY}px)`;
+            updateTransform();
         });
 
         window.addEventListener('mouseup', () => { isDragging = false; });
 
-        // Касание пальцем (Мобильный Telegram)
+        // Колесико мыши для зума на ПК
+        container.addEventListener('wheel', (e) => {
+            e.preventDefault();
+            if (e.deltaY < 0) {
+                scale = Math.min(scale + 0.1, 3);
+            } else {
+                scale = Math.max(scale - 0.1, 0.5);
+            }
+            updateTransform();
+        }, { passive: false });
+
+        // Управление пальцами (Мобильный Telegram)
         container.addEventListener('touchstart', (e) => {
             if (e.touches.length === 1) {
+                // Одиночное касание (Перетаскивание)
                 isDragging = true;
                 startX = e.touches[0].clientX - translateX;
                 startY = e.touches[0].clientY - translateY;
-            }
-        });
-
-        // Движение пальца (Мобильный Telegram)
