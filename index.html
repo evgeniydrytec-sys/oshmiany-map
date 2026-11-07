@@ -9,255 +9,56 @@
             margin: 0;
             padding: 0;
             height: 100%;
-            background-color: #f4ece1;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+            background-color: #f4f4f4;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
             overflow: hidden;
-            user-select: none;
         }
         .container {
             display: flex;
             flex-direction: column;
             height: 100%;
-            position: relative;
         }
         .header-panel {
-            background-color: #3e2723;
+            background-color: #4285F4; /* Фирменный синий цвет Google */
             color: #fff;
             padding: 12px;
             text-align: center;
             font-size: 15px;
             font-weight: bold;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
             z-index: 10;
         }
-        #map-container {
+        .map-wrapper {
             flex: 1;
             position: relative;
-            background-color: #e5d3b3;
-            overflow: hidden;
-        }
-        #map-viewport {
-            width: 2000px; /* Делаем карту большой для перетаскивания */
-            height: 1500px;
-            position: absolute;
-            transform-origin: 0 0;
-            cursor: grab;
-        }
-        #map-viewport:active {
-            cursor: grabbing;
-        }
-        #map-svg {
             width: 100%;
             height: 100%;
         }
-        .village-marker {
-            fill: #d32f2f;
-            stroke: #3e2723;
-            stroke-width: 2;
-            cursor: pointer;
-            transition: r 0.2s;
-        }
-        .village-marker:hover {
-            fill: #1565c0;
-            r: 12;
-        }
-        .village-label {
-            fill: #3e2723;
-            font-size: 13px;
-            font-weight: bold;
-            text-anchor: middle;
-            pointer-events: none;
-            background: white;
-        }
-        /* Шторка данных */
-        .info-panel {
-            position: absolute;
-            bottom: 0;
-            left: 0;
-            right: 0;
-            background: white;
-            border-top-left-radius: 16px;
-            border-top-right-radius: 16px;
-            box-shadow: 0 -4px 15px rgba(0,0,0,0.2);
-            padding: 16px;
-            transform: translateY(100%);
-            transition: transform 0.3s ease-out;
-            z-index: 100;
-            max-height: 50%;
-            overflow-y: auto;
-        }
-        .info-panel.active {
-            transform: translateY(0);
-        }
-        .close-btn {
-            float: right;
-            background: #eee;
-            border: none;
-            padding: 6px 12px;
-            border-radius: 5px;
-            cursor: pointer;
-            font-weight: bold;
-        }
-        .popup-title {
-            font-size: 16px;
-            font-weight: bold;
-            margin-bottom: 10px;
-            color: #3e2723;
-        }
-        .popup-table {
+        /* Стили для фрейма Google Карты */
+        #google-map {
             width: 100%;
-            border-collapse: collapse;
-            font-size: 12px;
-            margin-top: 10px;
-        }
-        .popup-table th, .popup-table td {
-            border: 1px solid #e0e0e0;
-            padding: 8px;
-            text-align: left;
-        }
-        .popup-table th {
-            background-color: #f5f5f5;
-            color: #5d4037;
-        }
-        .popup-table a {
-            color: #1565c0;
-            text-decoration: none;
-            font-weight: bold;
+            height: 100%;
+            border: none;
         }
     </style>
 </head>
 <body>
 
     <div class="container">
-        <div class="header-panel">📜 Гео-Архив: Ошмянский повет (1850)</div>
+        <div class="header-panel">🗺️ Архивный сервис: Ошмянский повет (Google Карты)</div>
         
-        <div id="map-container">
-            <div id="map-viewport">
-                <svg id="map-svg">
-                    <defs>
-                        <pattern id="grid" width="50" height="50" patternUnits="userSpaceOnUse">
-                            <path d="M 50 0 L 0 0 0 50" fill="none" stroke="#d4bfa2" stroke-width="1"/>
-                        </pattern>
-                    </defs>
-                    <rect width="100%" height="100%" fill="url(#grid)" />
-                    <!-- Историческая река Вилия -->
-                    <path d="M 100 200 Q 500 300 900 150 T 1800 250" fill="none" stroke="#90caf9" stroke-width="5" opacity="0.6"/>
-                    <g id="markers-group"></g>
-                </svg>
-            </div>
-        </div>
-
-        <div id="info-panel" class="info-panel">
-            <button class="close-btn" onclick="closePanel()">✕</button>
-            <div id="panel-content"></div>
+        <div class="map-wrapper">
+            <!-- Официальное встраивание Google Карт, адаптированное под Telegram.
+                 Центр установлен на Ошмяны (координаты 54.4249, 25.9356) -->
+            <iframe 
+                id="google-map"
+                src="https://google.com" 
+                allowfullscreen="" 
+                loading="lazy" 
+                referrerpolicy="no-referrer-when-downgrade">
+            </iframe>
         </div>
     </div>
 
-    <script>
-        // Данные ревизских сказок
-        const rawRecords = [
-            { fond: "515", opis: "15", delo: "866", pages: "3об-4", owner: "Иосиф Улан", estate: "Клопаче", type: "двор", place: "Поляны", url: "https://familysearch.org" },
-            { fond: "515", opis: "15", delo: "866", pages: "3об-5", owner: "Иосиф Улан", estate: "Клопаче", type: "деревня", place: "Клопаче", url: "https://familysearch.org" },
-            { fond: "515", opis: "15", delo: "866", pages: "13об-16", owner: "Томаш Геронимович Умястовский", estate: "Тальковщизна", type: "деревня", place: "Тальковщизна", url: "https://familysearch.org" },
-            { fond: "515", opis: "15", delo: "866", pages: "21об-22", owner: "Авраам Матвеевич Улан", estate: "Поляны", type: "фольварок", place: "Поляны", url: "https://familysearch.org" },
-            { fond: "515", opis: "15", delo: "866", pages: "21об-22", owner: "Авраам Матвеевич Улан", estate: "Поляны", type: "деревня", place: "Клопаче", url: "https://familysearch.org" },
-            { fond: "515", opis: "15", delo: "866", pages: "29об-33", owner: "Антоний Яковлевич Умястовский", estate: "Бердовщизна", type: "деревня", place: "Сураж", url: "https://familysearch.org" },
-            { fond: "515", opis: "15", delo: "866", pages: "419об-424", owner: "Михаил Геронимович Хрептович", estate: "Вишнево", type: "местечко", place: "Вишнево", url: "https://familysearch.org" }
-        ];
-
-        // Четко заданные физические координаты для демонстрации
-        const coordinatesPreset = {
-            "двор Поляны": {x: 300, y: 400},
-            "деревня Клопаче": {x: 450, y: 350},
-            "деревня Тальковщизна": {x: 700, y: 500},
-            "фольварок Поляны": {x: 320, y: 440},
-            "деревня Сураж": {x: 900, y: 380},
-            "местечко Вишнево": {x: 650, y: 700}
-        };
-
-        const placesOnMap = {};
-        rawRecords.forEach(row => {
-            const key = `${row.type} ${row.place}`.trim();
-            if (!placesOnMap[key]) {
-                // Если точка не задана в пресете, ставим ее в центр
-                const coords = coordinatesPreset[key] || {x: 500, y: 500};
-                placesOnMap[key] = {
-                    name: row.place,
-                    type: row.type,
-                    x: coords.x,
-                    y: coords.y,
-                    records: []
-                };
-            }
-            placesOnMap[key].records.push(row);
-        });
-
-        const markersGroup = document.getElementById('markers-group');
-        
-        for (const key in placesOnMap) {
-            const data = placesOnMap[key];
-            const g = document.createElementNS("http://w3.org", "g");
-            
-            const circle = document.createElementNS("http://w3.org", "circle");
-            circle.setAttribute("cx", data.x);
-            circle.setAttribute("cy", data.y);
-            circle.setAttribute("r", 9);
-            circle.setAttribute("class", "village-marker");
-            
-            // Клик открывает нижнюю шторку данных
-            circle.addEventListener('click', (function(currentData) {
-                return function(e) { 
-                    e.stopPropagation();
-                    showPanel(currentData); 
-                };
-            })(data));
-            
-            const text = document.createElementNS("http://w3.org", "text");
-            text.setAttribute("x", data.x);
-            text.setAttribute("y", data.y - 15);
-            text.setAttribute("class", "village-label");
-            text.textContent = data.name;
-            
-            g.appendChild(circle);
-            g.appendChild(text);
-            markersGroup.appendChild(g);
-        }
-
-        function showPanel(data) {
-            const panel = document.getElementById('info-panel');
-            const content = document.getElementById('panel-content');
-            
-            let html = `<div class="popup-title">📍 ${data.type} ${data.name}</div>`;
-            html += `<table class="popup-table">
-                        <thead>
-                            <tr>
-                                <th>Шифр дела</th>
-                                <th>Листы</th>
-                                <th>Помещик / Имение</th>
-                                <th>Документ</th>
-                            </tr>
-                        </thead>
-                        <tbody>`;
-            
-            data.records.forEach(rec => {
-                html += `<tr>
-                            <td>Ф. ${rec.fond}, оп. ${rec.opis}, д. ${rec.delo}</td>
-                            <td>${rec.pages}</td>
-                            <td><b>${rec.owner}</b><br><span style="color:#795548">им. ${rec.estate}</span></td>
-                            <td><a href="${rec.url}" target="_blank">Открыть ↗</a></td>
-                         </tr>`;
-            });
-            html += `</tbody></table>`;
-            
-            content.innerHTML = html;
-            panel.classList.add('active');
-        }
-
-        function closePanel() {
-            document.getElementById('info-panel').classList.remove('active');
-        }
-
-        // --- ЛОГИКА ДВИЖЕНИЯ И ЗУМА КАРТЫ (Drag & Zoom) ---
-        const container = document.getElementById('map-container');
-        const viewport = document.getElementById('map-viewport');
-
+</body>
+</html>
