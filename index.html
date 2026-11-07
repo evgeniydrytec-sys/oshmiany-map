@@ -33,19 +33,17 @@
         #map-container {
             flex: 1;
             position: relative;
-            background-color: #d4bfa2;
+            background-color: #e5d3b3;
             overflow: hidden;
         }
         #map-viewport {
-            width: 2400px; /* Большая карта для перемещения */
-            height: 1800px;
+            width: 1600px;
+            height: 1200px;
             position: absolute;
             transform-origin: 0 0;
-            cursor: grab;
-            background-color: #f2ebd9;
-        }
-        #map-viewport:active {
-            cursor: grabbing;
+            background-color: #e5d3b3;
+            left: 0;
+            top: 0;
         }
         #map-svg {
             width: 100%;
@@ -53,9 +51,10 @@
         }
         .grid-line {
             fill: none;
-            stroke: #e3d5be;
+            stroke: #d4bfa2;
             stroke-width: 1;
         }
+        /* Стили для точек-деревень */
         .village-marker {
             fill: #d32f2f;
             stroke: #fff;
@@ -63,12 +62,13 @@
             cursor: pointer;
         }
         .village-label {
-            fill: #2c3e50;
-            font-size: 13px;
+            fill: #3e2723;
+            font-size: 14px;
             font-weight: bold;
             text-anchor: middle;
             pointer-events: none;
         }
+        /* Шторка архивных данных */
         .info-panel {
             position: absolute;
             bottom: 0;
@@ -82,7 +82,7 @@
             transform: translateY(100%);
             transition: transform 0.3s ease-out;
             z-index: 100;
-            max-height: 55%;
+            max-height: 50%;
             overflow-y: auto;
         }
         .info-panel.active {
@@ -118,11 +118,6 @@
             background-color: #f5f5f5;
             color: #2c3e50;
         }
-        .popup-table a {
-            color: #1565c0;
-            text-decoration: none;
-            font-weight: bold;
-        }
     </style>
 </head>
 <body>
@@ -133,7 +128,6 @@
         <div id="map-container">
             <div id="map-viewport">
                 <svg id="map-svg">
-                    <!-- Рисуем координатную сетку уезда -->
                     <defs>
                         <pattern id="map-grid" width="60" height="60" patternUnits="userSpaceOnUse">
                             <path d="M 60 0 L 0 0 0 60" class="grid-line"/>
@@ -141,16 +135,37 @@
                     </defs>
                     <rect width="100%" height="100%" fill="url(#map-grid)" />
                     
-                    <!-- Река Вилия и притоки -->
-                    <path d="M 100 300 Q 600 450 1100 250 T 2200 400" fill="none" stroke="#a0c4ff" stroke-width="4" opacity="0.7"/>
-                    <path d="M 1100 250 Q 1200 600 1300 900" fill="none" stroke="#a0c4ff" stroke-width="2" opacity="0.5"/>
+                    <!-- Историческая река Вилия -->
+                    <path d="M 50 200 Q 400 350 800 200 T 1500 300" fill="none" stroke="#a0c4ff" stroke-width="5" opacity="0.7"/>
                     
-                    <!-- Сюда скрипт добавит наши исторические селения -->
-                    <g id="markers-group"></g>
+                    <!-- ТОЧКИ И ПОДПИСИ ВНЕДРЕНЫ НАПРЯМУЮ В HTML -->
+                    <!-- Каждая точка имеет вызов функции клика с её уникальным именем -->
+                    <g id="historic-places">
+                        <!-- Поляны -->
+                        <circle cx="300" cy="400" r="10" class="village-marker" onclick="openArchive('Поляны')"/>
+                        <text x="300" y="380" class="village-label">Поляны</text>
+
+                        <!-- Клопаче -->
+                        <circle cx="500" cy="320" r="10" class="village-marker" onclick="openArchive('Клопаче')"/>
+                        <text x="500" y="300" class="village-label">Клопаче</text>
+
+                        <!-- Тальковщизна -->
+                        <circle cx="750" cy="500" r="10" class="village-marker" onclick="openArchive('Тальковщизна')"/>
+                        <text x="750" y="480" class="village-label">Тальковщизна</text>
+
+                        <!-- Вишнево -->
+                        <circle cx="600" cy="750" r="10" class="village-marker" onclick="openArchive('Вишнево')"/>
+                        <text x="600" y="730" class="village-label">Вишнево</text>
+
+                        <!-- Сураж -->
+                        <circle cx="1100" cy="350" r="10" class="village-marker" onclick="openArchive('Сураж')"/>
+                        <text x="1100" y="330" class="village-label">Сураж</text>
+                    </g>
                 </svg>
             </div>
         </div>
 
+        <!-- Нижняя шторка данных -->
         <div id="info-panel" class="info-panel">
             <button class="close-btn" onclick="closePanel()">✕</button>
             <div id="panel-content"></div>
@@ -158,92 +173,53 @@
     </div>
 
     <script>
-        // Данные вашей таблицы 1850 года
-        const rawRecords = [
-            { fond: "515", opis: "15", delo: "866", pages: "3об-4", owner: "Иосиф Улан", estate: "Клопаче", type: "двор", place: "Поляны" },
-            { fond: "515", opis: "15", delo: "866", pages: "3об-5", owner: "Иосиф Улан", estate: "Клопаче", type: "деревня", place: "Клопаче" },
-            { fond: "515", opis: "15", delo: "866", pages: "13об-16", owner: "Томаш Умястовский", estate: "Тальковщизна", type: "деревня", place: "Тальковщизна" },
-            { fond: "515", opis: "15", delo: "866", pages: "21об-22", owner: "Авраам Улан", estate: "Поляны", type: "фольварок", place: "Поляны" },
-            { fond: "515", opis: "15", delo: "866", pages: "21об-22", owner: "Авраам Улан", estate: "Поляны", type: "деревня", place: "Клопаче" },
-            { fond: "515", opis: "15", delo: "866", pages: "29об-33", owner: "Антоний Умястовский", estate: "Бердовщизна", type: "деревня", place: "Сураж" },
-            { fond: "515", opis: "15", delo: "866", pages: "419об-424", owner: "Михаил Хрептович", estate: "Вишнево", type: "местечко", place: "Вишнево" }
-        ];
-
-        // Фиксированные географические точки Ошмянского региона на холсте
-        const positions = {
-            "двор Поляны": {x: 400, y: 500},
-            "деревня Клопаче": {x: 650, y: 420},
-            "деревня Тальковщизна": {x: 950, y: 650},
-            "фольварок Поляны": {x: 430, y: 560},
-            "деревня Сураж": {x: 1300, y: 480},
-            "местечко Вишнево": {x: 880, y: 950}
+        // Чистая база архивных документов без логики расстановки точек
+        const archiveDatabase = {
+            "Поляны": [
+                { type: "двор", fond: "515", delo: "866", pages: "3об-4", owner: "Иосиф Улан", estate: "Клопаче" },
+                { type: "фольварок", fond: "515", delo: "866", pages: "21об-22", owner: "Авраам Улан", estate: "Поляны" }
+            ],
+            "Клопаче": [
+                { type: "деревня", fond: "515", delo: "866", pages: "3об-5", owner: "Иосиф Улан", estate: "Клопаче" },
+                { type: "деревня", fond: "515", delo: "866", pages: "21об-22", owner: "Авраам Улан", estate: "Поляны" }
+            ],
+            "Тальковщизна": [
+                { type: "деревня", fond: "515", delo: "866", pages: "13об-16", owner: "Томаш Умястовский", estate: "Тальковщизна" }
+            ],
+            "Вишнево": [
+                { type: "местечко", fond: "515", delo: "866", pages: "419об-424", owner: "Михаил Хрептович", estate: "Вишнево" }
+            ],
+            "Сураж": [
+                { type: "деревня", fond: "515", delo: "866", pages: "29об-33", owner: "Антоний Умястовский", estate: "Бердовщизна" }
+            ]
         };
 
-        const placesOnMap = {};
-        rawRecords.forEach(row => {
-            const key = `${row.type} ${row.place}`.trim();
-            if (!placesOnMap[key]) {
-                const pos = positions[key] || {x: 600, y: 600};
-                placesOnMap[key] = {
-                    name: row.place,
-                    type: row.type,
-                    x: pos.x,
-                    y: pos.y,
-                    records: []
-                };
-            }
-            placesOnMap[key].records.push(row);
-        });
+        // Функция открытия шторки данных при клике на точку
+        function openArchive(placeName) {
+            const records = archiveDatabase[placeName];
+            if (!records) return;
 
-        const markersGroup = document.getElementById('markers-group');
-        
-        for (const key in placesOnMap) {
-            const data = placesOnMap[key];
-            const g = document.createElementNS("http://w3.org", "g");
-            
-            const circle = document.createElementNS("http://w3.org", "circle");
-            circle.setAttribute("cx", data.x);
-            circle.setAttribute("cy", data.y);
-            circle.setAttribute("r", 10);
-            circle.setAttribute("class", "village-marker");
-            
-            // Навешиваем обработчик клика, полностью совместимый с мобильным Telegram
-            circle.addEventListener('click', function(e) {
-                e.stopPropagation();
-                showPanel(data);
-            });
-            
-            const text = document.createElementNS("http://w3.org", "text");
-            text.setAttribute("x", data.x);
-            text.setAttribute("y", data.y - 16);
-            text.setAttribute("class", "village-label");
-            text.textContent = data.name;
-            
-            g.appendChild(circle);
-            g.appendChild(text);
-            markersGroup.appendChild(g);
-        }
-
-        function showPanel(data) {
             const panel = document.getElementById('info-panel');
             const content = document.getElementById('panel-content');
             
-            let html = `<div class="popup-title">📍 ${data.type} ${data.name}</div>`;
+            let html = `<div class="popup-title">📍 Документы по пункту: ${placeName}</div>`;
             html += `<table class="popup-table">
                         <thead>
                             <tr>
-                                <th>Шифр</th>
-                                <th>Листы</th>
-                                <th>Владелец / Имение</th>
+                                <th>Статус</th>
+                                <th>Архивный шифр</th>
+                                <th>Листы дела</th>
+                                <th>Помещик / Имение</th>
                             </tr>
                         </thead>
                         <tbody>`;
             
-            data.records.forEach(rec => {
+            records.forEach(rec => {
                 html += `<tr>
+                            <td><b>${rec.type}</b></td>
                             <td>Ф. ${rec.fond}, оп. 15, д. ${rec.delo}</td>
-                            <td>${rec.pages}</td>
-                            <td><b>${rec.owner}</b><br><span style="color:#795548">им. ${rec.estate}</span></td>
+                            <td>л. ${rec.pages}</td>
+                            <td>${rec.owner}<br><span style="color:#795548; font-size:11px;">им. ${rec.estate}</span></td>
                          </tr>`;
             });
             html += `</tbody></table>`;
@@ -256,15 +232,38 @@
             document.getElementById('info-panel').classList.remove('active');
         }
 
-        // --- УПРАВЛЕНИЕ КАРТОЙ ДЛЯ ТЕЛЕФОНОВ И ПК ---
+        // Простая, безошибочная логика перетаскивания карты пальцем/мышкой
         const container = document.getElementById('map-container');
         const viewport = document.getElementById('map-viewport');
 
         let isDragging = false;
         let startX, startY;
-        let translateX = -200, translateY = -200; // Центрируем холст на экране
+        let translateX = 0, translateY = 0;
 
-        viewport.style.transform = `translate(${translateX}px, ${translateY}px)`;
-
-        // Логика перетаскивания мышкой (ПК)
+        // Нажатие мыши (ПК)
         container.addEventListener('mousedown', (e) => {
+            isDragging = true;
+            startX = e.clientX - translateX;
+            startY = e.clientY - translateY;
+        });
+
+        // Движение мыши (ПК)
+        window.addEventListener('mousemove', (e) => {
+            if (!isDragging) return;
+            translateX = e.clientX - startX;
+            translateY = e.clientY - startY;
+            viewport.style.transform = `translate(${translateX}px, ${translateY}px)`;
+        });
+
+        window.addEventListener('mouseup', () => { isDragging = false; });
+
+        // Касание пальцем (Мобильный Telegram)
+        container.addEventListener('touchstart', (e) => {
+            if (e.touches.length === 1) {
+                isDragging = true;
+                startX = e.touches[0].clientX - translateX;
+                startY = e.touches[0].clientY - translateY;
+            }
+        });
+
+        // Движение пальца (Мобильный Telegram)
